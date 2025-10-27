@@ -1,3 +1,7 @@
 /test/
 /heavy_ops/
 /third_part/
+/test/
+
+__pycache__/
+*.py[oc]git 
