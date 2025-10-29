@@ -23,21 +23,20 @@ class FFmpegCutOp(BaseOps):
         """
         构建并执行 ffmpeg 命令。
         """
-        # 优化 ffmpeg 命令，-ss 放在 -i 前面可以利用关键帧，速度更快
         cmd = [
             self.ffmpeg_bin,
             "-loglevel", "error",
             "-ss", str(start),
             "-i", in_file,
             "-t", str(dur),
-            "-c:v", "copy",  # 默认使用流拷贝，速度最快。如果需要重编码，可以改回 libx264
-            "-c:a", "copy",
+            "-c:v", "libx264",  # 默认使用流拷贝，速度最快。如果需要重编码，可以改回 libx264
+            "-c:a", "aac",
             "-map", "0",
             "-movflags", "+faststart",
             "-y", # 覆盖输出文件
             out_file,
         ]
-        
+
         for attempt in range(self.max_retry):
             try:
                 # 运行命令，并捕获标准输出和标准错误

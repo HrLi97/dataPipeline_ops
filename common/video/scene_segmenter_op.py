@@ -11,8 +11,13 @@ from scenedetect.video_splitter import split_video_ffmpeg
 
 from ..base_ops import BaseOps
 
-# 默认的 FFmpeg 参数，用于拷贝视频流、音频流和字幕流，避免重新编码
-DEFAULT_FFMPEG_ARGS = "-map 0:v:0 -map 0:a? -map 0:s? -c copy"
+DEFAULT_FFMPEG_ARGS = (
+    "-map 0:v:0 "
+    "-map 0:a? "
+    "-map 0:s? "
+    "-c:v libx264 "
+    "-c:a aac"     
+)
 
 def split_scene_recursively(scene, fps, max_duration, min_duration):
     """
