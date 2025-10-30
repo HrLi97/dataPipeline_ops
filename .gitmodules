@@ -1,0 +1,6 @@
+[submodule "third_part_real"]
+	path = third_part_real
+	url = git@github.com:FasterProcess/CLIB-TensorRT.git
+[submodule "third_part/CLIB-TensorRT"]
+	path = third_part/CLIB-TensorRT
+	url = git@github.com:FasterProcess/CLIB-TensorRT.git
