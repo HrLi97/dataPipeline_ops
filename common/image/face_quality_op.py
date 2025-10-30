@@ -1,8 +1,14 @@
 """
 封装 FaceQualityModel:接收 face_img(BGR or RGB),返回 quality score 与 message。
 """
+import sys
+import os
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from ..base_ops import BaseOps
-from inference import FaceQualityModel
+from dataPipeline_ops.third_part.AdaFace_master.inference import FaceQualityModel
 
 class FaceQualityOp(BaseOps):
     def __init__(self, model_path=None, clib_path=None, device="cuda", **kwargs):

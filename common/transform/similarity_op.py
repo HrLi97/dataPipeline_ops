@@ -1,6 +1,6 @@
 # ops/similarity_op.py
 """
-封装 AdaFaceMatcher：提供 predict_similarity(a,b) 接口
+封装 AdaFaceMatcher:提供 predict_similarity(a,b) 接口
 """
 from ..base_ops import BaseOps
 

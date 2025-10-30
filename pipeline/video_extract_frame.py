@@ -3,7 +3,12 @@
 首先检查视频的分辨率,分段(5s)提取一张图片,为了防止复制粘贴,从最后的1s提取ref imgs 然后要校验人脸是否一致
 """
 
+import sys
 import os
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import csv
 import logging
 import argparse
@@ -52,8 +57,8 @@ def init_models_in_worker(opt):
     在 worker/子进程中初始化重量级模型,并返回实例字典。
     """
     from mmdet.apis import init_detector
-    from inference import FaceQualityModel
-    from utils.face_similarity import AdaFaceMatcher
+    from dataPipeline_ops.third_part.AdaFace_master.inference import FaceQualityModel
+    from dataPipeline_ops.data.a6000_yuan.face_similarity import AdaFaceMatcher
 
     mmdet_model = init_detector(opt.det_config, opt.det_checkpoint, device="cuda")
     face_quality_model = FaceQualityModel(

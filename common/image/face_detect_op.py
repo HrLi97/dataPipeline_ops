@@ -2,7 +2,7 @@
 封装 RetinaFace 人脸检测：输入 frame(RGB)或 crop(BGR),返回 faces dict。
 """
 from ..base_ops import BaseOps
-from retinaface import RetinaFace  # 你的 repo 中的 retinaface
+from retinaface import RetinaFace 
 
 class FaceDetectOp(BaseOps):
     def __init__(self, **kwargs):
