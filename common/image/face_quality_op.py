@@ -8,7 +8,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from ..base_ops import BaseOps
-from dataPipeline_ops.third_part.AdaFace_master.inference import FaceQualityModel
+from dataPipeline_ops.third_part.CLIB_TensorRT.CLIB_FIQA.inference import FaceQualityModel
 
 class FaceQualityOp(BaseOps):
     def __init__(self, model_path=None, clib_path=None, device="cuda", **kwargs):

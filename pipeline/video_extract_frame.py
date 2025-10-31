@@ -57,7 +57,7 @@ def init_models_in_worker(opt):
     在 worker/子进程中初始化重量级模型,并返回实例字典。
     """
     from mmdet.apis import init_detector
-    from dataPipeline_ops.third_part.AdaFace_master.inference import FaceQualityModel
+    from dataPipeline_ops.third_part.CLIB_TensorRT.CLIB_FIQA.inference import FaceQualityModel
     from dataPipeline_ops.data.a6000_yuan.face_similarity import AdaFaceMatcher
 
     mmdet_model = init_detector(opt.det_config, opt.det_checkpoint, device="cuda")
@@ -143,7 +143,6 @@ class Worker:
 
     def _extract_refs_from_item(self, item: dict) -> dict:
         """
-        依据原 RefExtractorOp 的逻辑：
         - 扫描视频前 first_frac 的帧(step=20)
         - 对每个 person box: 检测脸 -> 质量打分 -> 去重(相似度 + iou)
         返回在 item['best_faces'] 中。
