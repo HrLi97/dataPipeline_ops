@@ -1,8 +1,6 @@
 # dataPipeline_ops/common/video/__init__.py
-from .ffmpeg_cut_op import FFmpegCutOp
-from .video_info_op import VideoInfoOp
+from ..base_ops import BaseOps
 
 __all__ = [
-    "FFmpegCutOp",
-    "VideoInfoOp",
+    "BaseOps",
 ]
