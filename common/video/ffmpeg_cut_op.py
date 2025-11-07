@@ -110,3 +110,18 @@ class FFmpegCutOp(BaseOps):
             item["cut_error"] = "ffmpeg execution failed"
         
         return item
+    
+if __name__ == "__main__":
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/video_list.csv"
+    
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        video_path = f.readline().strip()
+
+    cutter = FFmpegCutOp()
+    test_case = {
+        "file_path": video_path,
+        "out_path": "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/cut_videos_output/cut_from_csv.mp4",
+        "start_time": 5.0,
+        "duration": 3.5,
+    }
+    cutter.predict(test_case)
