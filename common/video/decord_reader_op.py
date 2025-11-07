@@ -2,10 +2,13 @@
 """
 使用 decord 读取视频并提供抽帧接口（比如按每 5s 取帧、取最后 1s 的参考帧等）。
 """
-from ..base_ops import BaseOps
 from decord import VideoReader, cpu
 import ffmpeg
 import numpy as np
+import os
+import sys
+
+from ..base_ops import BaseOps
 
 class DecordReaderOp(BaseOps):
     def __init__(self, use_gpu=False, **kwargs):
@@ -52,3 +55,43 @@ class DecordReaderOp(BaseOps):
         idxs = list(range(start, total_frame))
         frames = vr.get_batch(idxs).asnumpy()
         return idxs, frames
+
+if __name__ == "__main__":
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/video_list.csv"
+
+    if not os.path.exists(csv_file_path):
+        print(f"错误:CSV 文件不存在于 -> {csv_file_path}")
+        sys.exit(1)
+
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        video_paths = [line.strip() for line in f if line.strip()]
+
+    if not video_paths:
+        print("错误:CSV 文件中没有找到任何视频路径。")
+        sys.exit(1)
+    
+    print(f"成功从 CSV 文件中读取 {len(video_paths)} 个视频路径。")
+
+    reader = DecordReaderOp()
+    for video_path in video_paths:
+        print(f"\n======== 正在处理: {video_path} ========")
+
+        if not os.path.exists(video_path):
+            print(f"警告：跳过，文件不存在 -> {video_path}")
+            continue
+
+        item = {"file_path": video_path}
+        item = reader.predict(item)
+        
+        if "reader_error" in item:
+            print("错误:", item["reader_error"])
+        else:
+            vr = item["vr"]
+            fps = vr.get_avg_fps()
+            print("总帧数:", item["total_frame"], "| FPS:", fps)
+            
+            idxs, frames = reader.sample_frames_by_seconds(vr, fps, interval_sec=5)
+            print("按5秒采样索引:", idxs)
+            
+            idxs_ref, frames_ref = reader.sample_ref_frames_last_n_seconds(vr, fps, last_n_seconds=1)
+            print("最后1秒参考帧索引:", idxs_ref)
