@@ -1,6 +1,11 @@
 /test/
-/heavy_ops/
-/third_part/
+
+/third_part/Lumen-main
+/third_part/EasyOCR
+/third_part/lama
+/third_part/lbm
+/third_part/AdaFace_master
+
 /test/
 /data/
 /tmp/
