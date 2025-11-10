@@ -172,3 +172,37 @@ class SceneSegmenterOp(BaseOps):
 
         item["segments"] = segments
         return item
+    
+if __name__ == "__main__":
+    import logging
+    import ffmpeg # 导入 ffmpeg-python
+
+    logging.basicConfig(level=logging.INFO)
+    
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/video_list.csv"
+    
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        video_path = f.readline().strip()
+
+    # 1. 探测视频的真实信息
+    probe = ffmpeg.probe(video_path)
+    video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+    real_duration = float(probe['format']['duration'])
+    real_fps = eval(video_stream['avg_frame_rate'])
+
+    # 2. 将真实数据填入 item
+    test_item = {
+        "file_path": video_path,
+        "total_duration": real_duration,
+        "fps": real_fps,
+    }
+
+    # 3. 执行算子
+    segmenter = SceneSegmenterOp(
+        segment_duration_sec=4, 
+        min_segment_duration_sec=3,
+        output_file_template="/datas/workspace/wangshunyao/dataPipeline_ops/tmp/segmenter_out/{base_name}_{seg_idx:02d}.mp4"
+    )
+    
+    result = segmenter.predict(test_item)
+    print(result.get("segments"))

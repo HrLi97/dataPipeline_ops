@@ -51,3 +51,15 @@ class VideoProbeOp(BaseOps):
             item["total_duration"] = float(duration)
         item["fps"] = float(fps or 0.0)
         return item
+
+if __name__ == "__main__":
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/video_list.csv"
+    
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        video_path = f.readline().strip()
+
+    probe_op = VideoProbeOp()
+    test_item = {"file_path": video_path}
+    result_item = probe_op.predict(test_item)
+    
+    print(result_item)
