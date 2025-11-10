@@ -1,5 +1,5 @@
 """
-封装 mmdet/person 检测(复用你原有的 detect_person_mmdet 导入路径)；
+封装 mmdet/person 检测
 改进点：
 - 保留并把原始导入放到文件顶部(如你要求)
 - 支持 item['frame'](RGB)或 item['image'](BGR)
@@ -12,10 +12,12 @@ import os
 import logging
 import cv2
 import numpy as np
+from mmdet.apis import inference_detector
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 from dataPipeline_ops.data.a6000_yuan.find_person_mmdet_one_and_two import detect_person_mmdet
+
 from ..base_ops import BaseOps
 
 detect_person_mmdet = detect_person_mmdet
@@ -86,7 +88,7 @@ class PersonDetectOp(BaseOps):
 
         # 首次尝试调用(以调用方传入的通道顺序为准)
         try:
-            boxes = detect_person_mmdet(img, None, self.mmdet_model, score_thr=self.score_thr) or []
+            boxes = detect_person_mmdet(img, inference_detector, self.mmdet_model, score_thr=self.score_thr) or []
         except Exception as e:
             last_err = e
             logging.debug("person_detect_op: 初次 detect_person_mmdet 抛错: %s", e)
@@ -122,3 +124,29 @@ class PersonDetectOp(BaseOps):
             item["person_boxes"] = []
 
         return item
+
+if __name__ == "__main__":
+    from mmdet.apis import init_detector
+
+    DET_CONFIG = "/datas/workspace/wangshunyao/dataPipeline_ops/third_part/mmdetection-main/configs/rtmdet/rtmdet_x_8xb32-300e_coco.py"
+    DET_CHECKPOINT = "/datas/workspace/wangshunyao/dataPipeline_ops/third_part/mmdetection-main/configs/rtmdet/rtmdet_x_8xb32-300e_coco_20220715_230555-cc79b9ae.pth"
+    mmdet_model_instance = init_detector(DET_CONFIG, DET_CHECKPOINT, device="cuda")
+
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/image_list.csv"
+    
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        image_path = f.readline().strip()
+
+    # 读取 BGR 图像，并将其放入 'image' 键，以测试算子的 BGR 输入路径
+    bgr_image = cv2.imread(image_path)
+    
+    person_op = PersonDetectOp(mmdet_model=mmdet_model_instance, score_thr=0.5)
+    
+    test_item = {"image": bgr_image}
+    result_item = person_op.predict(test_item)
+
+    # 为了不在终端打印巨大的图像数组，我们先将其从结果中移除
+    if "image" in result_item:
+        del result_item["image"]
+    
+    print(result_item)

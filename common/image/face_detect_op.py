@@ -27,3 +27,26 @@ class FaceDetectOp(BaseOps):
             item["face_detect_error"] = str(e)
             item.setdefault("faces_in_frame", {})
         return item
+
+if __name__ == "__main__":
+    import cv2
+
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/image_list.csv"
+    
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        image_path = f.readline().strip()
+
+    # 算子需要的是图像数组(frame)，而不是路径，所以我们先用 cv2 读取
+    # cv2.imread 默认读取为 BGR，算子的 "frame" 输入需要 RGB，所以转换一下
+    bgr_image = cv2.imread(image_path)
+    rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+
+    detector = FaceDetectOp()
+    test_item = {"frame": rgb_image}
+    result_item = detector.predict(test_item)
+    
+    # 为了不在终端打印巨大的图像数组，我们先将其从结果中移除
+    if "frame" in result_item:
+        del result_item["frame"]
+
+    print(result_item)
