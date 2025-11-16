@@ -52,3 +52,22 @@ class SaveImageOp(BaseOps):
                 pass
         item["saved_paths"] = list(save_paths.keys())
         return item
+
+if __name__ == '__main__':
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/image_list.csv"
+    output_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/saved_image_test.jpg"
+
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        source_image_path = f.readline().strip()
+    
+    image_to_save = cv2.imread(source_image_path)
+
+    op = SaveImageOp()
+    item = {
+        "save_paths": {
+            "test_image": (output_path, image_to_save)
+        }
+    }
+    result = op.predict(item)
+
+    print(f"Test finished. Image from '{source_image_path}' should be saved to '{output_path}'.")
