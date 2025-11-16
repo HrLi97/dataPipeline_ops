@@ -1,6 +1,4 @@
-# pipeline_scene.py
 """
-简化版 pipeline:本地串行或 Ray 并行两种模式。
 使用 ops 包中的 VideoProbeOp 和 SceneSegmenterOp 完成 probe + 切片工作。
 """
 
