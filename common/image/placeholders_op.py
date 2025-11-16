@@ -22,7 +22,6 @@ class PlaceholdersOp(BaseOps):
             try:
                 input_images = ast.literal_eval(raw_input_images)
             except Exception:
-                # 可能本身是单个路径字符串
                 input_images = [raw_input_images]
         elif isinstance(raw_input_images, list):
             input_images = raw_input_images
@@ -48,3 +47,24 @@ class PlaceholdersOp(BaseOps):
         item['input_images_list'] = input_images
         item['orig_img_path'] = orig_img_path
         return item
+
+if __name__ == '__main__':
+    import json
+
+    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/image_list.csv"
+    with open(csv_file_path, 'r', encoding='utf-8') as f:
+        source_image_path = f.readline().strip()
+
+    op = PlaceholdersOp()
+
+    test_item = {
+        "input_images": str([source_image_path, "/path/to/another_ref.jpg"]),
+        "output_image": "/path/to/target_image.jpg"
+    }
+
+    result_item = op.predict(test_item)
+
+    print(f"--- Testing PlaceholdersOp using base path: {source_image_path} ---")
+    print("Generated 'placeholders':")
+    print(json.dumps(result_item.get('placeholders'), indent=2))
+    print("\n--- Test finished. ---")
