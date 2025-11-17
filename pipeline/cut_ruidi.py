@@ -115,9 +115,9 @@ class CpuWorker:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--is_local", action="store_true", default=False)
+    parser.add_argument('--is_local', default=True, type=bool)
     parser.add_argument(
-        "--csv_path",
+        "--input_csv_path",
         type=str,
         default="/home/ubuntu/MyFiles/haoran/code/Data_process_talking/pipeline_for_i2i_person/data/r2v_batch1.csv",
     )
@@ -134,7 +134,7 @@ def main():
 
     # 本地模式：用 pandas 读取 CSV，逐条调用 CpuWorker()
     if args.is_local:
-        samples = list(pd.read_csv(args.csv_path).T.to_dict().values())
+        samples = list(pd.read_csv(args.input_csv_path).T.to_dict().values())
         worker = CpuWorker()
         results = []
         for item in samples:
