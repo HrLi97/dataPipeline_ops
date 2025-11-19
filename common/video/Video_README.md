@@ -11,3 +11,6 @@
 4. scene_segmenter_op - 根据设定的固定时长，将视频切分为多个片段。
    - input: file_path, total_duration, fps
    - output: segments (包含各切片路径和时间的列表)
+5. decord_reader_op - 使用 decord 库读取视频文件，生成视频读取器对象(VideoReader)并获取基础尺寸信息，为后续抽帧操作做准备。
+   - input: file_path
+   - output: vr (decord VideoReader对象), total_frame, height, width
