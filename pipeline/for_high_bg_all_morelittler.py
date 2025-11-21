@@ -1,7 +1,6 @@
 """
 Pipeline: for_high_bg_all_morelittler.py
 功能：从 jsonl 读入记录 -> 对 input_images 与 output_image 运行人物检测/抠图/背景去除/保存 -> 结果追加写 output_jsonl
-保持本地/ Ray 分支与原文件结构尽量一致，算子职责在 common/ 下。
 """
 import os
 import json
@@ -19,33 +18,33 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from mmdet.apis import init_detector
-from dataPipeline_ops.third_part.CLIB_TensorRT.CLIB_FIQA.inference import FaceQualityModel
-from dataPipeline_ops.third_part.lbm.src.lbm.inference import get_model
+from third_part.lbm.src.lbm.inference import get_model
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
-from dataPipeline_ops.third_part.toolsbg import BEN_Base
+from third_part.toolsbg.BNE2 import BEN_Base
 from groundingdino.util.inference import load_model
 
 # 从 common 导入算子
 from common.image.person_detect_op import PersonDetectOp
 from common.image.retinaface_op import RetinaFaceOp
-from common.image.face_quality_op import FaceQualityOp
 from common.image.grounding_mask_op import GroundingMaskOp
 from common.transform.lbm_op import LBMOp
 from common.transform.bg_rm_op import BgRmOp
 from common.image.save_image_op import SaveImageOp
 from common.io.save_jsonl_op import SaveJsonlOp
 
-# 你的外部 heavy deps 会在 Worker._lazy_init 中加载并注入到算子
 parser = argparse.ArgumentParser(description='high bg pipeline')
 parser.add_argument('--input_json_path', default='/home/ubuntu/.../web-image-multipel_and_single.json')
 parser.add_argument('--output_jsonl_root', default='/home/ubuntu/.../out.jsonl')
 parser.add_argument('--output_dir_root', default='/home/ubuntu/.../out_dir/')
 parser.add_argument('--is_local', default=False, type=bool)
 parser.add_argument("--ray_log_dir", type=str, default="/home/ubuntu/.../ray_log")
-parser.add_argument("--det_checkpoint", default="/home/ubuntu/.../rtmdet_x_...pth")
-parser.add_argument("--det_config", default="/home/ubuntu/.../rtmdet_x_...py")
+parser.add_argument("--det_checkpoint", default="/datas/workspace/wangshunyao/dataPipeline_ops/third_part/mmdetection-main/configs/rtmdet/rtmdet_x_8xb32-300e_coco_20220715_230555-cc79b9ae.pth", help="Checkpoint file for detection")
+parser.add_argument("--det_config", default="/datas/workspace/wangshunyao/dataPipeline_ops/third_part/mmdetection-main/configs/rtmdet/rtmdet_x_8xb32-300e_coco.py")
 opt = parser.parse_args()
+
+GROUNDING_DINO_CONFIG = "dataPipeline_ops/third_part/Grounded_SAM2_opt/grounding_dino"
+GROUNDING_DINO_CHECKPOINT = "dataPipeline_ops/third_part/Grounded_SAM2_opt/gdino_checkpoints"
 
 # ---- Worker 类（lazy init） ----
 class Worker:
@@ -54,7 +53,6 @@ class Worker:
         # 算子占位
         self.person_detect_op = None
         self.retina_op = None
-        self.face_quality_op = None
         self.grounding_op = None
         self.lbm_op = None
         self.bg_rm_op = None
@@ -63,7 +61,6 @@ class Worker:
 
         # 模型引用（会在 lazy_init 中创建）
         self.mmdet_model = None
-        self.face_quality_model = None
         self.image_predictor = None
         self.lbm_model = None
         self.bg_rm_model = None
@@ -74,7 +71,6 @@ class Worker:
         logging.info("Worker lazy init: 在当前进程中加载模型并构造算子")
 
         self.mmdet_model = init_detector(opt.det_config, opt.det_checkpoint, device="cuda")
-        self.face_quality_model = FaceQualityModel("/home/ubuntu/.../RN50.pt", "/home/ubuntu/.../CLIB-FIQA_R50.pth")
         # grounding + sam
         try:
             gm = load_model(model_config_path=GROUNDING_DINO_CONFIG, model_checkpoint_path=GROUNDING_DINO_CHECKPOINT, device="cuda")
@@ -82,17 +78,16 @@ class Worker:
             gm = None
         self.grounding_model = gm
         sam_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
-        sam_ckpt = "/home/ubuntu/.../sam2.1_hiera_large.pt"
+        sam_ckpt = "/datas/workspace/wangshunyao/dataPipeline_ops/third_part/Grounded_SAM2_opt/checkpoints/sam2.1_hiera_large.pt"
         sam_model = build_sam2(sam_cfg, sam_ckpt)
         self.image_predictor = SAM2ImagePredictor(sam_model)
-        self.lbm_model = get_model("/home/ubuntu/.../LBM_relighting", torch_dtype=torch.bfloat16, device="cuda")
+        self.lbm_model = get_model("/datas/workspace/wangshunyao/dataPipeline_ops/third_part/LBM_relighting", torch_dtype=torch.bfloat16, device="cuda")
         self.bg_rm_model = BEN_Base().to("cuda").eval()
-        self.bg_rm_model.loadcheckpoints('/home/ubuntu/.../BEN2_Base.pth')
+        self.bg_rm_model.loadcheckpoints('/datas/workspace/wangshunyao/dataPipeline_ops/third_part/toolsbg/BEN2_Base.pth')
 
         # 2) 构造算子并注入模型实例
         self.person_detect_op = PersonDetectOp(mmdet_model=self.mmdet_model, score_thr=0.80)
         self.retina_op = RetinaFaceOp()
-        self.face_quality_op = FaceQualityOp(face_quality_model=self.face_quality_model)
         self.grounding_op = GroundingMaskOp(image_predictor=self.image_predictor)
         self.lbm_op = LBMOp(lbm_model=self.lbm_model)
         self.bg_rm_op = BgRmOp(bg_rm_model=self.bg_rm_model)
@@ -258,7 +253,6 @@ class Worker:
             logging.exception("Worker 处理单条 json 出错")
         return item
 
-# ---- main 部分（保持你原脚本结构） ----
 if __name__ == '__main__':
     os.makedirs(os.path.dirname(opt.input_json_path), exist_ok=True, mode=0o777)
     os.makedirs(opt.output_dir_root, exist_ok=True)
