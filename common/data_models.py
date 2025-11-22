@@ -2,6 +2,8 @@ from typing import Any, Optional, List, Dict
 import torch
 import numpy as np
 import ffmpeg
+from third_part.utils_inference.src.utils_inference.bench.time_bench import test_time
+from third_part.utils_inference.src.utils_inference.common.global_values import GlobalValues
 
 
 class BaseData:
@@ -58,9 +60,13 @@ class BaseData:
         if s is None and allow_deduce:
             dt = self.data_.dtype
             if dt == torch.uint8:
-                s = 255.0
+                s = 2**8 - 1
             elif dt == torch.uint16:
-                s = 65535.0
+                s = 2**16 - 1
+            elif dt == torch.uint32:
+                s = 2**32 - 1
+            elif dt == torch.uint64:
+                s = 2**64 - 1
         if s is None:
             return False
         self.scale = s
@@ -79,7 +85,14 @@ class BaseData:
             return False
         x = self.data_.to(torch.float32) * s
         if img_type is None:
-            img_type = torch.uint8 if s <= 255 else torch.uint16
+            if s <= 255:
+                img_type = torch.uint8
+            elif s <= 65535:
+                img_type = torch.uint16
+            elif s <= 2**32 - 1:
+                img_type = torch.uint32
+            else:
+                img_type = torch.uint64
         self.data_ = x.to(img_type)
         return True
 
@@ -132,6 +145,47 @@ class BaseData:
         if isinstance(self.data_, torch.Tensor):
             self.data_ = self.data_.to(dtype)
         return self
+    
+    @test_time(enable=GlobalValues.ENABLE_PER)
+    @torch.no_grad()
+    def crop(self, bbox: List[int] = [0, 0, -1, -1]):
+        if bbox[2] < 0:
+            bbox[2] = self.width
+        if bbox[3] < 0:
+            bbox[3] = self.height
+
+        if self.format == "NHWC":
+            return VideoData(
+                self.data_[
+                    :, bbox[1] : bbox[1] + bbox[3], bbox[0] : bbox[0] + bbox[2], :
+                ],
+                format=self.format,
+                scale=self.scale,
+            )
+        else:
+            return VideoData(
+                self.data_[
+                    :, :, bbox[1] : bbox[1] + bbox[3], bbox[0] : bbox[0] + bbox[2]
+                ],
+                format=self.format,
+                scale=self.scale,
+            )
+    
+    @test_time(enable=GlobalValues.ENABLE_PER)
+    @torch.no_grad()
+    def splice(self, x, y, video_data):
+        if video_data.format != self.format or video_data.device != self.device:
+            return False
+
+        if self.format == "NCHW":
+            self.data_[:, :, y : y + video_data.height, x : x + video_data.width] = (
+                video_data.data_
+            )
+        else:
+            self.data_[:, y : y + video_data.height, x : x + video_data.width, :] = (
+                video_data.data_
+            )
+        return True
 
     @property
     def data(self):
