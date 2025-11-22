@@ -9,6 +9,7 @@ import os
 import sys
 
 from ..base_ops import BaseOps
+from ..data_models import VideoData
 
 class DecordReaderOp(BaseOps):
     def __init__(self, use_gpu=False, **kwargs):
@@ -23,21 +24,10 @@ class DecordReaderOp(BaseOps):
         vr = VideoReader(video_path, width=width, height=height, ctx=ctx)
         return vr
 
-    def predict(self, item: dict) -> dict:
-        path = item.get("file_path")
-        if not path:
-            item["reader_error"] = "no file_path"
-            return item
-        try:
-            vr = self._open_vr(path)
-            total_frame = len(vr)
-            item["vr"] = vr  # 注意：如果在多进程中传递 item，这个对象不可序列化；仅供本地流程使用
-            item["total_frame"] = total_frame
-            item["height"] = vr[0].asnumpy().shape[0]
-            item["width"] = vr[0].asnumpy().shape[1]
-        except Exception as e:
-            item["reader_error"] = str(e)
-        return item
+    def predict(self, data: VideoData) -> VideoData:
+        # 精简后的数据类仅包含 tensor/format/scale；视频路径/reader 不再挂在对象上
+        # 此算子在精简模式下不执行文件读取，建议在外部把帧转换为 tensor 后传入本算子链路
+        return data
 
     # 辅助方法：按秒抽帧（每 interval_sec 抽一帧），返回 ndarray list（RGB）
     def sample_frames_by_seconds(self, vr, fps, interval_sec=5):

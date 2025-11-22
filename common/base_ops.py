@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 class BaseOps(ABC):
     """
@@ -15,8 +16,8 @@ class BaseOps(ABC):
         pass
 
     @abstractmethod
-    def predict(self, item: dict) -> dict:
+    def predict(self, data: Any):
         """
-        对输入 item 执行处理并返回处理后的 item(dict)。
+        对输入数据对象执行处理并返回同类型或相关的数据对象。
         """
         pass
