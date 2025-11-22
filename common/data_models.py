@@ -3,8 +3,14 @@ import torch
 import numpy as np
 import ffmpeg
 
+
 class BaseData:
-    def __init__(self, tensor: Optional[torch.Tensor] = None, format: str = "NCHW", scale: Optional[float] = None):
+    def __init__(
+        self,
+        tensor: Optional[torch.Tensor] = None,
+        format: str = "NCHW",
+        scale: Optional[float] = None,
+    ):
         self.data_ = tensor
         self.format_ = format.upper()
         self.scale = scale
@@ -14,7 +20,15 @@ class BaseData:
         return self.__class__(tensor=t, format=self.format_, scale=self.scale)
 
     def values_like(self, value: Optional[float] = None):
-        new = self.__class__(tensor=torch.empty_like(self.data_) if isinstance(self.data_, torch.Tensor) else None, format=self.format_, scale=self.scale)
+        new = self.__class__(
+            tensor=(
+                torch.empty_like(self.data_)
+                if isinstance(self.data_, torch.Tensor)
+                else None
+            ),
+            format=self.format_,
+            scale=self.scale,
+        )
         if value is not None and isinstance(new.data_, torch.Tensor):
             new.data_.fill_(value)
         return new
@@ -25,9 +39,16 @@ class BaseData:
     def is_norm(self) -> bool:
         if not isinstance(self.data_, torch.Tensor):
             return False
-        return self.data_.dtype not in (torch.uint8, torch.uint16, torch.uint32, torch.uint64)
+        return self.data_.dtype not in (
+            torch.uint8,
+            torch.uint16,
+            torch.uint32,
+            torch.uint64,
+        )
 
-    def try_norm(self, dtype: torch.dtype = torch.float32, allow_deduce: bool = True) -> bool:
+    def try_norm(
+        self, dtype: torch.dtype = torch.float32, allow_deduce: bool = True
+    ) -> bool:
         if not isinstance(self.data_, torch.Tensor):
             return False
         if self.is_norm():
@@ -46,7 +67,9 @@ class BaseData:
         self.data_ = (self.data_.to(torch.float32) / s).to(dtype)
         return True
 
-    def try_denorm(self, img_type: Optional[torch.dtype] = None, scale: Optional[float] = None) -> bool:
+    def try_denorm(
+        self, img_type: Optional[torch.dtype] = None, scale: Optional[float] = None
+    ) -> bool:
         if not isinstance(self.data_, torch.Tensor):
             return False
         if not self.is_norm():
@@ -90,6 +113,26 @@ class BaseData:
             self.format_ = "NHWC"
         return self
 
+    def add_batch(self):
+        if isinstance(self.data_, torch.Tensor) and self.data_.ndim == 3:
+            self.data_ = self.data_.unsqueeze(0)
+        return self
+
+    def remove_batch(self):
+        if isinstance(self.data_, torch.Tensor) and self.data_.ndim == 4:
+            self.data_ = self.data_[0]
+        return self
+
+    def ensure_contiguous(self):
+        if isinstance(self.data_, torch.Tensor):
+            self.data_ = self.data_.contiguous()
+        return self
+
+    def to_dtype(self, dtype: torch.dtype):
+        if isinstance(self.data_, torch.Tensor):
+            self.data_ = self.data_.to(dtype)
+        return self
+
     @property
     def data(self):
         return self.data_
@@ -126,7 +169,11 @@ class BaseData:
         s = self.shape
         if not s:
             return None
-        return s[1] if self.format_ == "NCHW" else s[3] if len(s) >= 4 else (s[2] if len(s) == 3 else None)
+        return (
+            s[1]
+            if self.format_ == "NCHW"
+            else s[3] if len(s) >= 4 else (s[2] if len(s) == 3 else None)
+        )
 
     @property
     def height(self):
@@ -146,8 +193,14 @@ class BaseData:
         meta = {"format": self.format_, "shape": self.shape, "scale": self.scale}
         return {f"{self.__class__.__name__.lower()}_meta": meta}
 
+
 class VideoData(BaseData):
-    def __init__(self, tensor: Optional[torch.Tensor] = None, format: str = "NCHW", scale: Optional[float] = None):
+    def __init__(
+        self,
+        tensor: Optional[torch.Tensor] = None,
+        format: str = "NCHW",
+        scale: Optional[float] = None,
+    ):
         super().__init__(tensor=tensor, format=format, scale=scale)
 
     def clone(self) -> "VideoData":
@@ -157,14 +210,17 @@ class VideoData(BaseData):
     def to_item(self, item: Optional[dict] = None) -> dict:
         return super().to_item(item)
 
-
     def is_norm(self) -> bool:
         return super().is_norm()
 
-    def try_norm(self, dtype: torch.dtype = torch.float32, allow_deduce: bool = True) -> bool:
+    def try_norm(
+        self, dtype: torch.dtype = torch.float32, allow_deduce: bool = True
+    ) -> bool:
         return super().try_norm(dtype=dtype, allow_deduce=allow_deduce)
 
-    def try_denorm(self, img_type: Optional[torch.dtype] = None, scale: Optional[float] = None) -> bool:
+    def try_denorm(
+        self, img_type: Optional[torch.dtype] = None, scale: Optional[float] = None
+    ) -> bool:
         return super().try_denorm(img_type=img_type, scale=scale)
 
     def to_device(self, device: Any) -> "VideoData":
@@ -215,8 +271,14 @@ class VideoData(BaseData):
     def width(self):
         return super().width
 
+
 class ImageData(BaseData):
-    def __init__(self, tensor: Optional[torch.Tensor] = None, format: str = "NCHW", scale: Optional[float] = None):
+    def __init__(
+        self,
+        tensor: Optional[torch.Tensor] = None,
+        format: str = "NCHW",
+        scale: Optional[float] = None,
+    ):
         super().__init__(tensor=tensor, format=format, scale=scale)
 
     def to_item(self, item: Optional[dict] = None) -> dict:
@@ -224,19 +286,83 @@ class ImageData(BaseData):
 
     @classmethod
     def from_path(cls, path: str, to_format: str = "NHWC", scale: float = 255.0):
-        import cv2, numpy as np, torch
-        bgr = cv2.imread(path)
-        if bgr is None:
+        ii = FFmpegImageInfo(path)
+        ok = ii.init(path)
+        if not ok:
             raise FileNotFoundError(f"failed to read image: {path}")
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        t = torch.from_numpy(rgb)
+        return ii.load_data(to_format=to_format, scale=scale)
+
+    @classmethod
+    def from_numpy(cls, arr: np.ndarray, to_format: str = "NHWC", scale: float = 255.0):
+        t = torch.from_numpy(arr)
         if to_format.upper() == "NCHW":
-            t = t.permute(2, 0, 1)
+            if t.ndim == 4:
+                t = t.permute(0, 3, 1, 2)
+            elif t.ndim == 3:
+                t = t.permute(2, 0, 1)
         return cls(tensor=t, format=to_format.upper(), scale=scale)
+
+    @classmethod
+    def from_bgr_numpy(cls, arr: np.ndarray, to_format: str = "NHWC", scale: float = 255.0):
+        if arr.ndim == 3 and arr.shape[-1] == 3:
+            arr = arr[:, :, [2, 1, 0]]
+        elif arr.ndim == 4 and arr.shape[-1] == 3:
+            arr = arr[:, :, :, [2, 1, 0]]
+        return cls.from_numpy(arr, to_format=to_format, scale=scale)
+
+    def to_numpy(self, denorm: bool = True) -> np.ndarray:
+        x = self.data_
+        if not isinstance(x, torch.Tensor):
+            return None
+        if self.format_ == "NCHW":
+            if x.ndim == 4:
+                x = x.contiguous().permute(0, 2, 3, 1)
+            elif x.ndim == 3:
+                x = x.contiguous().permute(1, 2, 0)
+        if denorm and self.is_norm():
+            s = self.scale if self.scale is not None else 255.0
+            x = (x.to(torch.float32) * s).clamp(0, 255).to(torch.uint8)
+        return x.detach().cpu().numpy()
+
+    def swap_rb(self):
+        x = self.data_
+        if isinstance(x, torch.Tensor):
+            if self.format_ == "NHWC":
+                if x.ndim == 4 and x.shape[-1] == 3:
+                    self.data_ = x[:, :, :, [2, 1, 0]]
+                elif x.ndim == 3 and x.shape[-1] == 3:
+                    self.data_ = x[:, :, [2, 1, 0]]
+            else:
+                if x.ndim == 4 and x.shape[1] == 3:
+                    self.data_ = x[:, [2, 1, 0], :, :]
+                elif x.ndim == 3 and x.shape[0] == 3:
+                    self.data_ = x[[2, 1, 0], :, :]
+        return self
+
+    def to_bgr(self):
+        return self.swap_rb()
+
+    def to_rgb(self):
+        return self.swap_rb()
+
+    def to_bgr_numpy(self, denorm: bool = True) -> np.ndarray:
+        arr = self.to_numpy(denorm=denorm)
+        if arr is None:
+            return None
+        if arr.ndim == 3 and arr.shape[-1] == 3:
+            return arr[:, :, [2, 1, 0]]
+        if arr.ndim == 4 and arr.shape[-1] == 3:
+            return arr[:, :, :, [2, 1, 0]]
+        return arr
 
 
 class TextData(BaseData):
-    def __init__(self, tensor: Optional[torch.Tensor] = None, format: str = "NT", scale: Optional[float] = None):
+    def __init__(
+        self,
+        tensor: Optional[torch.Tensor] = None,
+        format: str = "NT",
+        scale: Optional[float] = None,
+    ):
         super().__init__(tensor=tensor, format=format, scale=scale)
 
     def to_item(self, item: Optional[dict] = None) -> dict:
@@ -244,11 +370,61 @@ class TextData(BaseData):
 
 
 class AudioData(BaseData):
-    def __init__(self, tensor: Optional[torch.Tensor] = None, format: str = "NCL", scale: Optional[float] = None):
+    def __init__(
+        self,
+        tensor: Optional[torch.Tensor] = None,
+        format: str = "NCL",
+        scale: Optional[float] = None,
+    ):
         super().__init__(tensor=tensor, format=format, scale=scale)
 
     def to_item(self, item: Optional[dict] = None) -> dict:
         return super().to_item(item)
+
+class FFmpegImageInfo:
+    def __init__(self, file_path: Optional[str] = None):
+        self.file_path = file_path
+        self.width = 0
+        self.height = 0
+        self.channel = 3
+        self.pix_fmt = None
+        self.bit_rate = 0
+        self.duration = 0.0
+        if self.file_path:
+            self.init(self.file_path)
+
+    def init(self, file_path: Optional[str] = None) -> bool:
+        if file_path is not None:
+            self.file_path = file_path
+        try:
+            meta = ffmpeg.probe(self.file_path)
+            vs = next(s for s in meta["streams"] if s.get("codec_type") == "video")
+            self.width = int(vs.get("width") or 0)
+            self.height = int(vs.get("height") or 0)
+            self.pix_fmt = vs.get("pix_fmt")
+            self.bit_rate = int(
+                vs.get("bit_rate") or meta.get("format", {}).get("bit_rate") or 0
+            )
+            dur = meta.get("format", {}).get("duration")
+            self.duration = float(dur) if dur is not None else 0.0
+            return self.width > 0 and self.height > 0
+        except Exception:
+            return False
+
+    def load_data(self, to_format: str = "NHWC", scale: float = 255.0) -> ImageData:
+        import numpy as np, torch
+        out = ffmpeg.input(self.file_path).output(
+            "pipe:", format="rawvideo", pix_fmt="rgb24", vframes=1
+        )
+        raw, _ = ffmpeg.run(out, capture_stdout=True, capture_stderr=True)
+        arr = np.frombuffer(raw, np.uint8)
+        if arr.size != self.height * self.width * 3:
+            return ImageData(tensor=None, format=to_format)
+        rgb = arr.reshape((self.height, self.width, 3))
+        t = torch.from_numpy(rgb)
+        if to_format.upper() == "NCHW":
+            t = t.permute(2, 0, 1)
+        return ImageData(tensor=t, format=to_format.upper(), scale=scale)
 
 class FFmpegVideoInfo:
     def __init__(self, file_path: Optional[str] = None):
@@ -261,6 +437,8 @@ class FFmpegVideoInfo:
         self.bit_rate = 0
         self.pix_fmt = None
         self.duration = 0.0
+        if self.file_path:
+            self.init(self.file_path)
 
     def init(self, file_path: Optional[str] = None) -> bool:
         if file_path is not None:
@@ -274,14 +452,20 @@ class FFmpegVideoInfo:
             a, b = fr.split("/")
             self.fps = float(a) / float(b) if float(b) != 0 else 0.0
             self.pix_fmt = vs.get("pix_fmt")
-            self.bit_rate = int(vs.get("bit_rate") or meta.get("format", {}).get("bit_rate") or 0)
+            self.bit_rate = int(
+                vs.get("bit_rate") or meta.get("format", {}).get("bit_rate") or 0
+            )
             dur = meta.get("format", {}).get("duration")
             self.duration = float(dur) if dur is not None else 0.0
             nf = vs.get("nb_frames")
             if nf is not None:
                 self.num_frame = int(nf)
             else:
-                self.num_frame = int(round(self.duration * self.fps)) if self.fps > 0 and self.duration > 0 else 0
+                self.num_frame = (
+                    int(round(self.duration * self.fps))
+                    if self.fps > 0 and self.duration > 0
+                    else 0
+                )
             self.channel = 3
             return self.num_frame > 0 and self.width > 0 and self.height > 0
         except Exception:
@@ -293,12 +477,16 @@ class FFmpegVideoInfo:
             return d.strip().lower(), int(i.strip())
         return device_str.strip().lower(), 0
 
-    def load_data_by_index(self, indexs: List[int], device: str = "cpu", format: str = "NHWC") -> VideoData:
+    def load_data_by_index(
+        self, indexs: List[int], device: str = "cpu", format: str = "NHWC"
+    ) -> VideoData:
         if not indexs:
             return VideoData(tensor=None, format=format)
         expr = "+".join([f"eq(n\\,{i})" for i in indexs])
-        out = ffmpeg.input(self.file_path).filter("select", expr).output(
-            "pipe:", format="rawvideo", pix_fmt="rgb24", vframes=len(indexs)
+        out = (
+            ffmpeg.input(self.file_path)
+            .filter("select", expr)
+            .output("pipe:", format="rawvideo", pix_fmt="rgb24", vframes=len(indexs))
         )
         raw, _ = ffmpeg.run(out, capture_stdout=True, capture_stderr=True)
         h, w = self.height, self.width
@@ -315,8 +503,41 @@ class FFmpegVideoInfo:
             vd.to_format("NCHW")
         return vd
 
-    def load_data(self, offset: int, max_num_frame: int, sample_rate: int = 1) -> VideoData:
+    def load_data(
+        self, offset: int, max_num_frame: int, sample_rate: int = 1
+    ) -> VideoData:
         if max_num_frame < 0:
             max_num_frame = self.num_frame
-        idxs = list(range(offset, min(offset + sample_rate * max_num_frame, self.num_frame), sample_rate))[:max_num_frame]
+        sr = max(1, sample_rate)
+        idxs = list(
+            range(
+                offset,
+                min(offset + sr * max_num_frame, self.num_frame),
+                sr,
+            )
+        )[:max_num_frame]
         return self.load_data_by_index(idxs)
+
+    def load_frame_at_time(self, second: float, format: str = "NHWC") -> VideoData:
+        try:
+            out = ffmpeg.input(self.file_path, ss=second).output(
+                "pipe:", format="rawvideo", pix_fmt="rgb24", vframes=1
+            )
+            raw, _ = ffmpeg.run(out, capture_stdout=True, capture_stderr=True)
+            h, w = self.height, self.width
+            arr = np.frombuffer(raw, np.uint8)
+            if arr.size != h * w * 3:
+                return VideoData(tensor=None, format=format)
+            arr = arr.reshape((1, h, w, 3))
+            ten = torch.from_numpy(arr)
+            vd = VideoData(tensor=ten, format="NHWC", scale=255.0)
+            if format.upper() == "NCHW":
+                vd.to_format("NCHW")
+            return vd
+        except Exception:
+            return VideoData(tensor=None, format=format)
+
+
+if __name__ == "__main__":
+    a = torch.tensor([1, 2, 3])
+    vid =  VideoData(tensor=a, format="NCHW", scale=255.0)

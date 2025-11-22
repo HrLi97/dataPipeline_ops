@@ -42,15 +42,10 @@ class FaceDetectOp(BaseOps):
 
 if __name__ == "__main__":
     import torch
-    
-    ffmpegVideoInfo = FFmpegVideoInfo("/mnt/cfs/shanhai/lihaoran/project/code/color/data/content/video/城市4k.mp4")
-    init = ffmpegVideoInfo.init()
-    print(ffmpegVideoInfo.width)
-    print(ffmpegVideoInfo.bit_rate)
     csv_file_path = "/mnt/cfs/shanhai/lihaoran/project/code/dataPipeline_ops/tmp/image_list.csv"
     with open(csv_file_path, 'r', encoding='utf-8') as f:
         image_path = f.readline().strip()
     img = ImageData.from_path(image_path, to_format="NHWC", scale=255.0)
-    detector = FaceDetectOp()x
+    detector = FaceDetectOp()
     out = detector.predict(img)
     print("faces keys:", list(getattr(out, "faces", {}).keys()))
