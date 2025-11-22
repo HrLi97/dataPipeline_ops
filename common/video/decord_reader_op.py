@@ -10,23 +10,14 @@ import sys
 
 from ..base_ops import BaseOps
 from ..data_models import VideoData
+from ..data_models import ImageData,FFmpegVideoInfo
+
 
 class DecordReaderOp(BaseOps):
     def __init__(self, use_gpu=False, **kwargs):
         self.use_gpu = use_gpu
 
-    def _open_vr(self, video_path):
-        # 使用 ffmpeg.probe 获取宽高并指定 decord 的 width/height 避免尺寸变化
-        meta = ffmpeg.probe(video_path)
-        vs = next(s for s in meta['streams'] if s['codec_type']=='video')
-        width, height = int(vs['width']), int(vs['height'])
-        ctx = cpu(0)
-        vr = VideoReader(video_path, width=width, height=height, ctx=ctx)
-        return vr
-
     def predict(self, data: VideoData) -> VideoData:
-        # 精简后的数据类仅包含 tensor/format/scale；视频路径/reader 不再挂在对象上
-        # 此算子在精简模式下不执行文件读取，建议在外部把帧转换为 tensor 后传入本算子链路
         return data
 
     # 辅助方法：按秒抽帧（每 interval_sec 抽一帧），返回 ndarray list（RGB）
@@ -46,17 +37,27 @@ class DecordReaderOp(BaseOps):
         frames = vr.get_batch(idxs).asnumpy()
         return idxs, frames
 
-if __name__ == "__main__":
-    csv_file_path = "/datas/workspace/wangshunyao/dataPipeline_ops/tmp/video_list.csv"
+    csv_file_path = "/mnt/cfs/shanhai/lihaoran/project/code/dataPipeline_ops/tmp/video_list.csv"
     with open(csv_file_path, 'r', encoding='utf-8') as f:
         video_paths = [line.strip() for line in f if line.strip()]
     reader = DecordReaderOp()
     for video_path in video_paths:
-        item = {"file_path": video_path}
-        item = reader.predict(item)
+        print(video_path)
+        vi = FFmpegVideoInfo(video_path)
+        print( "num_frame:", vi.num_frame)
+        vd = vi.load_data(offset=0, max_num_frame=min(5, vi.num_frame), sample_rate=max(1, int(vi.fps) or 1))
+        if vd.data is None:
+            print("no frames read")
+            continue
+        print("format:", vd.format, "shape:", vd.shape)
+        # safe access first frame in NHWC for inspection
+        frame0 = vd.data[0] if vd.format.upper() == "NHWC" else vd.data[0].permute(1, 2, 0)
+        print("frame0 shape:", tuple(frame0.shape))
         
-        vr = item["vr"]
-        fps = vr.get_avg_fps()
-        idxs, frames = reader.sample_frames_by_seconds(vr, fps, interval_sec=5)
+        # item = reader.predict(item)
         
-        idxs_ref, frames_ref = reader.sample_ref_frames_last_n_seconds(vr, fps, last_n_seconds=1)
+        # vr = item["vr"]
+        # fps = vr.get_avg_fps()
+        # idxs, frames = reader.sample_frames_by_seconds(vr, fps, interval_sec=5)
+        
+        # idxs_ref, frames_ref = reader.sample_ref_frames_last_n_seconds(vr, fps, last_n_seconds=1)
